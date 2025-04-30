@@ -9,10 +9,12 @@ class ProteinModel:
         self.esm_tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
         self.esm_model = AutoModel.from_pretrained("facebook/esm2_t33_650M_UR50D")
         
-        # Initialize ProtT5 model with legacy tokenizer
+        # Initialize ProtT5 model with specific tokenizer configuration
         self.prot_t5_tokenizer = AutoTokenizer.from_pretrained(
             "Rostlab/prot_t5_xl_uniref50",
-            legacy=True  # Use legacy tokenizer to avoid Unigram model error
+            use_fast=False,  # Use slow tokenizer instead of fast tokenizer
+            legacy=True,     # Use legacy tokenizer
+            model_max_length=512  # Set maximum sequence length
         )
         self.prot_t5_model = AutoModel.from_pretrained("Rostlab/prot_t5_xl_uniref50")
         
