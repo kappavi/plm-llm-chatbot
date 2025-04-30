@@ -1,4 +1,4 @@
-# PLM-LLM Biology QA System
+# PLM-LLM Biology QA Chatbot
 
 A specialized chatbot that combines Protein Language Models (PLMs) with Large Language Models (LLMs) to provide accurate and detailed answers to biology-related questions.
 
@@ -174,10 +174,6 @@ plm-llm-chatbot/
    ```
    Q: What is a nucleotide?
    ```
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
