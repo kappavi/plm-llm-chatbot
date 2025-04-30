@@ -2,6 +2,10 @@ import torch
 from transformers import AutoTokenizer, AutoModel
 import numpy as np
 from typing import Dict, List, Optional
+import re
+import requests
+from Bio import SeqIO
+from io import StringIO
 
 class ProteinModel:
     def __init__(self):
@@ -43,19 +47,75 @@ class ProteinModel:
             
         return embeddings
     
+    def extract_protein_sequence(self, text: str) -> Optional[str]:
+        """
+        Extract protein sequence from text using regex
+        """
+        # Pattern for protein sequences (uppercase letters, possibly with spaces)
+        pattern = r'[A-Z\s]{10,}'
+        matches = re.findall(pattern, text)
+        
+        if matches:
+            # Clean up the sequence (remove spaces, etc.)
+            sequence = ''.join(matches[0].split())
+            # Basic validation (should only contain valid amino acids)
+            if all(aa in 'ACDEFGHIKLMNPQRSTVWY' for aa in sequence):
+                return sequence
+        return None
+    
+    def get_protein_from_uniprot(self, protein_name: str) -> Optional[Dict]:
+        """
+        Fetch protein information from UniProt
+        """
+        try:
+            # Search UniProt
+            search_url = f"https://www.uniprot.org/uniprot/?query={protein_name}&format=fasta"
+            response = requests.get(search_url)
+            
+            if response.status_code == 200:
+                # Parse FASTA
+                fasta = StringIO(response.text)
+                record = next(SeqIO.parse(fasta, "fasta"))
+                
+                return {
+                    "protein_name": record.id,
+                    "sequence": str(record.seq),
+                    "description": record.description
+                }
+        except Exception as e:
+            print(f"Error fetching from UniProt: {str(e)}")
+        return None
+    
     def get_protein_context(self, question: str) -> Dict:
         """
         Extract protein-related context from the question
         """
-        # TODO: Implement protein sequence extraction from question
-        # This could involve:
-        # 1. Named entity recognition for protein names
-        # 2. Sequence extraction from databases
-        # 3. Structure prediction if needed
+        context = {
+            "protein_name": None,
+            "sequence": None,
+            "embeddings": None,
+            "description": None
+        }
         
-        # For now, return a placeholder
-        return {
-            "protein_name": "example_protein",
-            "sequence": "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN",
-            "embeddings": self.get_protein_embeddings("MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN")
-        } 
+        # Try to extract protein sequence directly from question
+        sequence = self.extract_protein_sequence(question)
+        if sequence:
+            context["sequence"] = sequence
+            context["embeddings"] = self.get_protein_embeddings(sequence)
+            return context
+        
+        # If no sequence found, look for protein names
+        # This is a simple implementation - could be improved with NER
+        protein_keywords = ['protein', 'enzyme', 'peptide', 'amino acid']
+        if any(keyword in question.lower() for keyword in protein_keywords):
+            # Extract potential protein names (simple implementation)
+            words = question.split()
+            for word in words:
+                if word.isupper() and len(word) > 2:  # Simple heuristic for protein names
+                    uniprot_data = self.get_protein_from_uniprot(word)
+                    if uniprot_data:
+                        context.update(uniprot_data)
+                        context["embeddings"] = self.get_protein_embeddings(uniprot_data["sequence"])
+                        return context
+        
+        return context 

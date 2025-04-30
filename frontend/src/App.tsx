@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [conversationId, setConversationId] = useState<string>('default');
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -22,10 +23,16 @@ const App: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Call backend API
+      // Call backend API with conversation ID
       const response = await axios.post('http://localhost:6001/api/chat', {
-        question: input
+        question: input,
+        conversation_id: conversationId
       });
+
+      // Update conversation ID if it's new
+      if (response.data.conversation_id !== conversationId) {
+        setConversationId(response.data.conversation_id);
+      }
 
       // Add assistant message
       const assistantMessage: Message = {
@@ -49,14 +56,28 @@ const App: React.FC = () => {
     setInput(e.target.value);
   };
 
+  const startNewConversation = () => {
+    setMessages([]);
+    setConversationId('default');
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto p-4">
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-          PLM-LLM Biology QA System
+          PLM-LLM Biology QA Chatbot
         </h1>
         
         <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={startNewConversation}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
+              Start New Conversation
+            </button>
+          </div>
+          
           <div className="h-96 overflow-y-auto mb-4">
             {messages.map((message: Message, index: number) => (
               <div

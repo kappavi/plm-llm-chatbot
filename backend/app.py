@@ -5,6 +5,7 @@ from models.llm_integration import LLMIntegration
 import os
 from dotenv import load_dotenv
 import numpy as np
+from typing import Dict, List
 
 # Load environment variables
 load_dotenv()
@@ -25,11 +26,15 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
+# Store conversation history in memory (in production, use a proper database)
+conversation_history: Dict[str, List[Dict]] = {}
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
         data = request.json
         question = data.get('question', '')
+        conversation_id = data.get('conversation_id', 'default')
         
         if not question:
             return jsonify({'error': 'No question provided'}), 400
@@ -38,15 +43,24 @@ def chat():
         protein_context = protein_model.get_protein_context(question)
         
         # Convert numpy arrays to lists for JSON serialization
-        if 'embeddings' in protein_context:
+        if 'embeddings' in protein_context and protein_context['embeddings'] is not None:
             protein_context['embeddings'] = protein_context['embeddings'].tolist()
         
-        # Get response from LLM
-        response = llm_model.format_response(question, protein_context)
+        # Get conversation history
+        history = conversation_history.get(conversation_id, [])
+        
+        # Get response from LLM with conversation history
+        response = llm_model.format_response(question=question, protein_context=protein_context, history=history)
+        
+        # Update conversation history
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": response})
+        conversation_history[conversation_id] = history
         
         return jsonify({
             'response': response,
-            'protein_context': protein_context
+            'protein_context': protein_context,
+            'conversation_id': conversation_id
         })
         
     except Exception as e:
