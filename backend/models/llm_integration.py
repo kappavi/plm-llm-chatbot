@@ -26,24 +26,54 @@ class LLMIntegration:
             print(f"Error in OpenAI API call: {str(e)}")
             return "I apologize, but I encountered an error while processing your request. Please try again."
             
-    def format_response(self, question: str, protein_context: Dict) -> str:
+    def format_response(self, question: str, protein_context: Optional[Dict] = None, history: Optional[List[Dict]] = None) -> str:
         """
-        Format the response using protein context
+        Format the response using protein context and conversation history
         """
-        system_prompt = """You are a biology expert assistant specialized in protein-related questions. 
-        Use the provided protein context to answer questions accurately and informatively.
-        If you don't have enough information, say so."""
+        system_prompt = """You are a biology expert assistant specialized in answering questions about biology, 
+        including proteins, DNA, RNA, and other biological molecules. 
+        When analyzing protein sequences, you should:
+        1. Identify the protein based on its sequence
+        2. Describe its structure and function
+        3. Explain any notable features or domains
+        4. Provide relevant biological context
         
-        user_prompt = f"""Question: {question}
-        Protein Context:
-        - Name: {protein_context.get('protein_name', 'Unknown')}
-        - Sequence: {protein_context.get('sequence', 'Not available')}
+        For protein-related questions, use the provided protein context to inform your answer.
+        For general biology questions, provide accurate information based on your expertise.
         
-        Please provide a detailed answer based on this context."""
+        When responding to follow-up questions, maintain context from previous messages and provide
+        additional details or clarification as needed."""
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        # Initialize protein_context if None
+        if protein_context is None:
+            protein_context = {}
+            
+        # Initialize history if None
+        if history is None:
+            history = []
+            
+        # Check if we have a protein sequence in the context
+        if protein_context and protein_context.get('sequence'):
+            user_prompt = f"""Question: {question}
+            
+            Protein Context:
+            - Sequence: {protein_context['sequence']}
+            
+            Please analyze this protein sequence and provide a detailed answer to the question.
+            Focus on the specific protein identified by this sequence, not general information about similar proteins.
+            If you recognize this sequence, provide specific details about this particular protein."""
+        else:
+            user_prompt = f"""Question: {question}
+            
+            Please provide a detailed answer based on your knowledge."""
+        
+        # Build messages list with system prompt, history, and current question
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history
+        messages.extend(history)
+        
+        # Add current question
+        messages.append({"role": "user", "content": user_prompt})
         
         return self.get_chat_completion(messages) 
